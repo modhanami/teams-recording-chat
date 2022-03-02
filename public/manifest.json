@@ -1,0 +1,43 @@
+{
+  "name": "Chat Synchronizer",
+  "description": "What",
+  "version": "1.0",
+  "manifest_version": 3,
+  "permissions": [
+    "webRequest",
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "*://*.sharepoint.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.sharepoint.com/*"
+      ],
+      "js": [
+        "content.js"
+      ]
+    }, {
+      "matches": ["*://teams.microsoft.com/*"],
+      "js": [
+        "chat-downloader.js"
+      ]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "matches": [
+        "*://*.sharepoint.com/*"
+      ],
+      "resources": [
+        "main.js"
+      ]
+    }
+  ]
+}
