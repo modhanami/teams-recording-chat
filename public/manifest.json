@@ -23,20 +23,13 @@
       "js": [
         "content.js"
       ]
-    }, {
-      "matches": ["*://teams.microsoft.com/*"],
-      "js": [
-        "chat-downloader.js"
-      ]
-    }
-  ],
-  "web_accessible_resources": [
+    },
     {
       "matches": [
-        "*://*.sharepoint.com/*"
+        "*://teams.microsoft.com/*"
       ],
-      "resources": [
-        "main.js"
+      "js": [
+        "chat-downloader.js"
       ]
     }
   ]

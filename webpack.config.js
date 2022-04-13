@@ -1,5 +1,4 @@
 const CopyPlugin = require('copy-webpack-plugin');
-const HtmlWebpackPlugin = require('html-webpack-plugin');
 const path = require('path');
 const webpack = require('webpack');
 
@@ -7,7 +6,6 @@ const webpack = require('webpack');
 module.exports = {
   mode: 'development',
   entry: {
-    main: './src/index.tsx',
     content: './src/content.ts',
     background: './src/background.ts',
     'chat-downloader': './src/chat-downloader.ts',
@@ -35,10 +33,6 @@ module.exports = {
     ]
   },
   plugins: [
-    new HtmlWebpackPlugin({
-      template: './public/index.html',
-      chunks: ['main'],
-    }),
     new CopyPlugin({
       patterns: [
         {

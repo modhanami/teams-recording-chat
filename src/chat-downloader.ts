@@ -1,3 +1,4 @@
+import { fetchConversationMessages } from "./lib/chat-service";
 import { ChatMessage } from "./shared/types";
 import { querySelectorAllWait, querySelectorWait } from "./utils";
 
@@ -9,42 +10,6 @@ function getSkypeTokenFromLocalStorage() {
 
 function isLinkChildOf(link: string, expectedParentId: string) {
   return link.indexOf(expectedParentId) > -1;
-}
-
-type FetchConversationMessagesOptions = {
-  threadId: string,
-  skypeToken: string,
-  startTime: string,
-  pageSize?: number,
-}
-
-async function fetchConversationMessages<Message = any>({
-  threadId,
-  skypeToken,
-  startTime,
-  pageSize = 100,
-}: FetchConversationMessagesOptions): Promise<Message[]> {
-  console.log(`Thread id: ${threadId}`);
-  console.log(`Skype token: ${skypeToken}`);
-  console.log(`Start time: ${startTime}`);
-  console.log(`Page size: ${pageSize}`);
-
-  const bakedUrl = `https://apac.ng.msg.teams.microsoft.com/v1/users/ME/conversations/${threadId}/messages?startTime=${startTime}&view=msnp24Equivalent&pageSize=${pageSize}`;
-
-  const response = await fetch(bakedUrl, {
-    headers: {
-      authentication: `skypetoken=${skypeToken}`
-    }
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch messages for thread ${threadId}`);
-  }
-
-  // _metadata contains next page syncState (currently not handled)
-  const dataWithMetadata = await response.json() as { messages: Message[], _metadata: any };
-  const messages = dataWithMetadata.messages;
-  return messages;
 }
 
 function exportJsonStringToFile(jsonString: string, fileName: string) {
@@ -99,7 +64,11 @@ function makeDownloadButtonOnClickHandler(parentMessageId: string) {
     });
 
     const recordedMeetingMessage = filteredMessagesFirstPass.find(message => message.contenttype === 'RichText/Media_CallRecording' && message.properties?.atp);
-    console.log(recordedMeetingMessage);
+    console.log('Recorded meeting message', recordedMeetingMessage);
+    if (!recordedMeetingMessage) {
+      console.log('This meeting is not recorded');
+      return;
+    }
 
     const sharepointUrl = JSON.parse(recordedMeetingMessage.properties.atp)[0].URL;
     console.log('url: ', sharepointUrl);
