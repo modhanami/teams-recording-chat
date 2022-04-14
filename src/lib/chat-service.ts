@@ -16,23 +16,41 @@ export async function fetchConversationMessages<Message = any>({
   console.log(`Start time: ${startTime}`);
   console.log(`Page size: ${pageSize}`);
 
-  const messagesUrl = createMessagesUrl(threadId, startTime, pageSize);
-  const response = await fetch(messagesUrl, {
-    headers: {
-      authentication: `skypetoken=${skypeToken}`
-    }
-  });
+  const requestIntervalInSecond = 3;
+  const fetchedMessages = [];
+  let nextUrl = createMessagesUrl(threadId, startTime, pageSize);
+  let requestCount = 0;
 
-  if (!response.ok) {
-    throw new Error(`Failed to fetch messages for thread ${threadId}`);
+  while (true) {
+    const response = await fetch(nextUrl, {
+      headers: {
+        authentication: `skypetoken=${skypeToken}`
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch messages for thread ${threadId} on the request no. ${++requestCount}`);
+    }
+
+    const parsedDataWithMetadata = await response.json();
+    const { messages, _metadata } = parsedDataWithMetadata;
+    fetchedMessages.push(...messages);
+
+    console.log(`Fetched ${messages.length} messages. Total: ${fetchedMessages.length}`);
+
+    if (messages.length === 0 || _metadata.syncState === undefined) {
+      console.log('No more messages to fetch');
+      break;
+    }
+
+    nextUrl = _metadata.syncState;
+
+    // wait for 3 second between each request
+    console.log(`Waiting for ${requestIntervalInSecond} seconds before next request`);
+    await new Promise(resolve => setTimeout(resolve, requestIntervalInSecond * 1000));
   }
 
-  // _metadata contains next page syncState (currently not handled)
-  const dataWithMetadata = await response.json() as { messages: Message[], _metadata: any };
-  console.log('Raw data', dataWithMetadata);
-  
-  const messages = dataWithMetadata.messages;
-  return messages;
+  return fetchedMessages;
 }
 
 function createMessagesUrl(threadId: string, startTime: string, pageSize: number): string {
