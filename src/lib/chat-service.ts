@@ -9,7 +9,7 @@ export async function fetchConversationMessages<Message = any>({
   threadId,
   skypeToken,
   startTime,
-  pageSize = 100,
+  pageSize = 200,
 }: FetchConversationMessagesOptions): Promise<Message[]> {
   console.log(`Thread id: ${threadId}`);
   console.log(`Skype token: ${skypeToken}`);
