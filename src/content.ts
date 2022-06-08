@@ -52,7 +52,7 @@ async function handleItemUrlMessage({ driveItemUrlWithAuthToken }: DriveItemUrlM
     function renderChatMessagesAtCurrentTime(currentTime: number) {
       render(chatRendererRoot, { messages: value, currentTime, startTime: startTime, endTime: endTime, timestampExtractor: (message: any) => message.timestamp });
     }
-    
+
     renderChatMessagesAtCurrentTime(0);
 
     observeCurrentTime((currentTime) => {
@@ -63,7 +63,7 @@ async function handleItemUrlMessage({ driveItemUrlWithAuthToken }: DriveItemUrlM
 }
 
 async function observeCurrentTime(callback: (currentTime: number) => void) {
-  const msStreamPlayer = await querySelectorWait<HTMLVideoElement>('video#vjs_video_1_html5_api');
+  const msStreamPlayer = await querySelectorWait<HTMLVideoElement>('video[src^="blob"]');
 
   msStreamPlayer.addEventListener('timeupdate', function (this, _event) {
     const currentTime = this.currentTime;
