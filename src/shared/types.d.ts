@@ -27,17 +27,3 @@ type CountMap = Record<string, number>;
 export interface EmotionPluginMetadata {
   emotions: CountMap;
 }
-
-// export type ChatMessage = {
-//   id: string;
-//   content: string;
-//   timestamp: number;
-//   sender: string;
-//   emotions: {
-//     name: string;
-//     users: {
-//       timestamp: number;
-//       mri: string;
-//     }[]
-//   }[]
-// }
