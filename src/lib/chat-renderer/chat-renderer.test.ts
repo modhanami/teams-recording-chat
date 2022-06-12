@@ -1,134 +1,124 @@
+import { ChatMessage } from "../../shared/types";
 import { ChatMessageRenderer } from "./chat-renderer";
 
-describe('Chat Message Reconciler', () => {
-  const startTime = 100;
-  const endTime = 300;
-  const messages = [
+describe('Chat Message Renderer', () => {
+  const messages: ChatMessage[] = [
     {
-      time: 105,
-      message: 'hello',
-      properties: {
-        emotions: [
-          {
-            key: 'laugh',
-            users: [
-              { time: 106 },
-              { time: 107 },
-              { time: 108 }
-            ]
-          },
-          {
-            key: 'sad',
-            users: [
-              { time: 108 },
-              { time: 109 },
-            ]
-          }
-        ]
-      }
+      id: '111',
+      timestamp: 105,
+      content: 'hello',
+      sender: '111',
+      emotions: [
+        {
+          name: 'laugh',
+          users: [
+            { timestamp: 121, mri: '106:mri' },
+            { timestamp: 134, mri: '107:mri' },
+            { timestamp: 199, mri: '108:mri' },
+          ]
+        },
+        {
+          name: 'sad',
+          users: [
+            { timestamp: 140, mri: '108:mri' },
+            { timestamp: 172, mri: '109:mri' },
+          ]
+        }
+      ]
     },
     {
-      time: 120,
-      message: 'world',
-      properties: {
-        emotions: [
-          {
-            key: 'laugh',
-            users: [
-              { time: 121 },
-              { time: 122 },
-              { time: 123 }
-            ]
-          }
-        ]
-      }
+      id: '112',
+      timestamp: 120,
+      content: 'world',
+      sender: '112',
+      emotions: [
+        {
+          name: 'laugh',
+          users: [
+            { timestamp: 121, mri: '121:mri' },
+            { timestamp: 150, mri: '122:mri' },
+            { timestamp: 210, mri: '123:mri' },
+          ]
+        }
+      ]
     },
     {
-      time: 150,
-      message: 'cxz'
+      id: '113',
+      timestamp: 150,
+      content: 'cxz',
+      sender: '113',
+      emotions: [],
     },
     {
-      time: 200,
-      message: 'def'
+      id: '114',
+      timestamp: 200,
+      content: 'def',
+      sender: '114',
+      emotions: [],
     },
     {
-      time: 270,
-      message: 'asd'
+      id: '115',
+      timestamp: 270,
+      content: 'asd',
+      sender: '115',
+      emotions: []
     }
   ];
 
-  const timeExtractor = (message: any) => message.time;
-  let reconciler: ChatMessageRenderer<Record<string, any>>;
+  const timeExtractor = (item: any) => item.timestamp;
+  let renderer: ChatMessageRenderer;
 
   beforeEach(() => {
-    reconciler = new ChatMessageRenderer(messages, startTime, endTime, timeExtractor);
+    renderer = new ChatMessageRenderer(messages, timeExtractor);
   });
 
-  describe('when the current time progresses', () => {
-
-    it('should return the messages that are before or equal to the current time', () => {
+  describe('when the time progresses', () => {
+    // messages
+    it('should return the messages that come before or equal to the current time', () => {
       const currentTime = 149;
-      const expected = messages.filter(message => message.time <= currentTime);
+      const expected = messages.filter(message => message.timestamp <= currentTime);
 
-      reconciler.seek(currentTime);
+      renderer.seek(currentTime);
 
-      expect(reconciler.currentMessages).toEqual(expected);
+      expect(renderer.getMessages().length).toBe(expected.length);
     });
 
-    it('should filter out messages that are after the current time', () => {
+    it('should filter out messages that come after the current time', () => {
       const currentTime = 200;
-      const expected = messages.filter(message => message.time <= currentTime);
-      const currentTime2 = 150;
-      const expected2 = messages.filter(message => message.time <= currentTime2);
+      const expected = messages.filter(message => message.timestamp <= currentTime);
 
-      reconciler.seek(currentTime);
+      renderer.seek(currentTime);
 
-      expect(reconciler.currentMessages).toEqual(expected);
-
-      reconciler.seek(currentTime2);
-
-      expect(reconciler.currentMessages).toEqual(expected2);
+      expect(renderer.getMessages().length).toBe(expected.length);
     });
 
+    // emotions
+    it('should return the emotions that come before or equal to the current time', () => {
+      const currentTime = 149;
 
-  })
+      renderer.seek(currentTime);
 
-  // describe('emotions plugin', () => {
-  //   it('should show emotions for each message up to the current time', () => {
-  //     reconciler.registerPlugin(new EmotionsPlugin({
-  //       reducer: (message: any, currentTime: number) => {
-  //         const emotions = message.emotions;
-  //         return emotions.reduce((emotionCountMap, emotion) => {
-  //           const emotionName = emotion.name;
-  //           let count = 0;
-  //           const userEmotions = emotion.users;
-  //           for (let i = 0; i < userEmotions.length; i++) {
-  //             const userEmotion = userEmotions[i];
+      const emotions = renderer.getMessages().flatMap((message) => message.emotions);
+      for (const emotion of emotions) {
+        for (const user of emotion.users.getItems()) {
+          expect(user.timestamp).toBeLessThanOrEqual(currentTime);
+        }
+      }
+    });
 
-  //             if (userEmotion.timestamp > currentTime) {
-  //               break;
-  //             }
-  //             count++;
-  //           }
+    it('should filter out emotions that come after the current time', () => {
+      const currentTime = 200;
 
-  //           if (count > 0) {
-  //             emotionCountMap[emotionName] = count;
-  //           }
+      renderer.seek(currentTime);
 
-  //           return emotionCountMap;
-  //         }, {});
-  //       }
-  //     }));
+      const emotions = renderer.getMessages().flatMap((message) => message.emotions);
+      for (const emotion of emotions) {
+        for (const user of emotion.users.getItems()) {
+          expect(user.timestamp).toBeLessThanOrEqual(currentTime);
+        }
+      }
+    });
 
-  //     const currentTime = 121;
-  //     const expected = messages.filter(message => message.time <= currentTime);
-  //     // filter out emotions that are after the current time
+  });
 
-  //     reconciler.seek(currentTime);
-
-  //     console.dir(reconciler.currentMessages, { depth: null });
-  //     expect(reconciler.currentMessages).toEqual(expected);
-
-  //   });
-  // });
 });

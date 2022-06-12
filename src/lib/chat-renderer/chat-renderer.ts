@@ -1,97 +1,104 @@
-import { ChatMessage, EmotionPluginMetadata } from "../../shared/types";
+import { ChatMessage, Emotion, Modify as Amend, MRIAndTimestamp } from "../../shared/types";
 
-// most of the these are hardcoded for now
-export class ChatMessageRenderer {
-  readonly messages: ChatMessage[];
-  readonly startTime: number;
-  readonly endTime: number;
-  readonly timestampExtractor: (message: ChatMessage) => number;
-  currentTime: number = 0;
-  cursor: number = 0;
-  currentMessages: WithMetadata<ChatMessage, Partial<EmotionPluginMetadata>>[] = [];
+interface Seeker {
+  seek(currentTime: number): void;
+}
 
-  constructor(messages: ChatMessage[], startTime: number, endTime: number, timestampExtractor: (message: ChatMessage) => number) {
-    this.messages = messages;
-    this.startTime = startTime;
-    this.endTime = endTime;
+export class SeekableItems<T> implements Seeker {
+  private currentTime: number = 0;
+  private nextCursor: number = 0;
+  private items: T[];
+
+  constructor(
+    private originalItems: T[],
+    private timestampExtractor: (message: T) => number,
+  ) {
+    this.originalItems = originalItems;
     this.timestampExtractor = timestampExtractor;
+    this.items = [];
   }
 
-  seek(currentTime: number) {
-    // if new current time is after the current current time, loop through the messages starting from the cursor
-    if (currentTime > this.currentTime) {
-      for (let i = this.cursor; i < this.messages.length; i++) {
-        // shalow copy the message
-        const message = { ...this.messages[i] };
-
-        const messageWithMetadata: WithMetadata<ChatMessage, EmotionPluginMetadata> = {
-          ...message,
-          _metadata: { emotions: {} },
-        };
-
-        const timestamp = this.timestampExtractor(message);
-
-        if (timestamp > currentTime) {
-          break;
-        }
-
-        this.currentMessages.push(messageWithMetadata);
-        this.cursor = i + 1;
-      }
+  seek(targetTime: number) {
+    if (targetTime > this.currentTime) {
+      this.seekForward(targetTime);
+    } else if (targetTime < this.currentTime) {
+      this.seekBackward(targetTime);
     }
 
-    // if new current time is before the current current time, loop through current messages backwards and remove messages that are after the current time
-    else if (currentTime < this.currentTime) {
-      for (let i = this.currentMessages.length - 1; i >= 0; i--) {
-        const message = this.currentMessages[i];
-        const timestamp = this.timestampExtractor(message);
+    this.currentTime = targetTime;
+  }
 
-        if (timestamp <= currentTime) {
-          break;
-        }
+  private seekForward(targetTime: number) {
+    for (let i = this.nextCursor; i < this.originalItems.length; i++) {
+      const element = this.originalItems[i];
 
-        this.currentMessages.pop();
-        this.cursor = i;
+      const timestamp = this.timestampExtractor(element);
+      if (timestamp > targetTime) {
+        break;
+      }
+
+      this.items.push(element);
+      this.nextCursor = i + 1;
+    }
+  }
+
+  private seekBackward(targetTime: number) {
+    for (let i = this.items.length - 1; i >= 0; i--) {
+      const element = this.items[i];
+
+      const timestamp = this.timestampExtractor(element);
+      if (timestamp > targetTime) {
+        this.items.pop();
+        this.nextCursor = i;
       }
     }
+  }
 
-    // count emotions
-    this.currentMessages.forEach(message => {
-      const emotions = message.emotions;
+  getItems() {
+    return this.items;
+  }
+}
 
-      const couontMap = emotions.reduce((emotionCountMap, emotion) => {
-        const emotionName = emotion.name;
-        const userEmotions = emotion.users;
-        let count = 0;
+type ChatMessageWithSeekableEmotionsUser = Amend<ChatMessage, {
+  emotions: Amend<Emotion, {
+    users: SeekableItems<MRIAndTimestamp>;
+  }>[];
+}>;
 
-        for (let i = 0; i < userEmotions.length; i++) {
-          const userEmotion = userEmotions[i];
 
-          if (userEmotion.timestamp > currentTime) {
-            break;
-          }
+export class ChatMessageRenderer {
+  private seekableMessages: SeekableItems<ChatMessageWithSeekableEmotionsUser>;
 
-          count++;
-        }
-
-        if (count > 0) {
-          emotionCountMap[emotionName] = count;
-        }
-
-        return emotionCountMap;
-      }, {});
-
-      message._metadata.emotions = couontMap;
+  constructor(
+    messages: ChatMessage[],
+    timestampExtractor: (message: any) => number,
+  ) {
+    const newMessages = messages.map((message) => {
+      return {
+        ...message,
+        emotions: message.emotions.map((emotion) => {
+          return {
+            ...emotion,
+            users: new SeekableItems(emotion.users, (user) => user.timestamp),
+          };
+        })
+      };
     });
 
-    this.currentTime = currentTime;
+    this.seekableMessages = new SeekableItems(newMessages, timestampExtractor);
+  }
+
+  seek(targetTime: number) {
+    this.seekableMessages.seek(targetTime);
+
+    for (const message of this.seekableMessages.getItems()) {
+      for (const emotion of message.emotions) {
+        emotion.users.seek(targetTime);
+      }
+    }
+  }
+
+  getMessages() {
+    return this.seekableMessages.getItems();
   }
 }
-
-type Metadata<T extends Record<string, any>> = {
-  _metadata: T;
-}
-
-export type WithMetadata<Original, NewMetadata extends Record<string, any> = {}> = Original extends Metadata<infer OldMetadata>
-  ? Original & Metadata<NewMetadata & OldMetadata>
-  : Original & Metadata<NewMetadata>;

@@ -2,14 +2,14 @@ export type DriveItemUrlMessage = {
   driveItemUrlWithAuthToken: string;
 }
 
-interface ChatMessageUserAndTimestamp {
+export type MRIAndTimestamp = {
   mri: string;
   timestamp: number;
 }
 
 interface Emotion {
   name: string;
-  users: ChatMessageUserAndTimestamp[];
+  users: MRIAndTimestamp[];
 }
 
 export interface BaseMessage {
@@ -27,3 +27,30 @@ type CountMap = Record<string, number>;
 export interface EmotionPluginMetadata {
   emotions: CountMap;
 }
+
+type BaseReplyChainMessage = {
+  id: string;
+  sequenceId: number;
+  content: string;
+  originalArrivalTime: number;
+  imDisplayName: string;
+  properties: {
+    emotions: {
+      key: string;
+      users: {
+        mri: string;
+        time: number;
+      }[];
+    }[];
+    atp: string;
+    deletetime: string;
+  };
+  messageType: string;
+  isSentByCurrentUser: boolean;
+}
+
+type BaseReplyChainManagerByMessageSearchKeysResult = {
+  messageMap: Record<string, BaseReplyChainMessage>;
+}
+
+type Modify<T, R> = Omit<T, keyof R> & R;

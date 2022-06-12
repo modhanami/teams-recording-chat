@@ -1,5 +1,5 @@
 
-import React, { useEffect, useRef, useState } from "react"; // esbuild-loader somehow requires React to be imported
+import React, { useEffect, useRef } from "react"; // esbuild-loader somehow requires React to be imported
 import { ChatMessageRenderer } from "./lib/chat-renderer/chat-renderer";
 
 export interface ChatRendererProps {
@@ -10,16 +10,16 @@ export interface ChatRendererProps {
   timestampExtractor: (message: any) => number;
 }
 
-function ChatRenderer({ messages, currentTime, startTime, endTime, timestampExtractor }: ChatRendererProps) {
-  // messages id is a timestamp
+function ChatRenderer({ messages, currentTime, startTime, timestampExtractor }: ChatRendererProps) {
   const lastCountRef = useRef(0);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [renderer] = useState<ChatMessageRenderer>(new ChatMessageRenderer(messages, startTime, endTime, timestampExtractor));
+  const _renderer = useRef<ChatMessageRenderer>(new ChatMessageRenderer(messages, timestampExtractor));
+  const renderer = _renderer.current;
 
   const currentTimestamp = startTime + currentTime;
   renderer.seek(currentTimestamp);
 
-  const messagesToRender = renderer.currentMessages;
+  const messagesToRender = renderer.getMessages();
 
   useEffect(() => {
     if (messagesToRender.length === lastCountRef.current) {
@@ -40,14 +40,19 @@ function ChatRenderer({ messages, currentTime, startTime, endTime, timestampExtr
           <div className='message-item text-sm text-white relative first:mt-auto hover:bg-white/[.04] p-2' key={message.id}>
             <div className='font-semibold'>{message.sender}</div>
             <div className="top-2 right-4 absolute flex flex-col">
-              {message._metadata?.emotions &&
-                Object.entries(message._metadata.emotions).map(([emotion, count]) => {
-                  return (
-                    <div key={emotion} className='text-xs text-gray-400'>
-                      {emotion}: {count}
-                    </div>
-                  )
-                })}
+              {message.emotions.map((emotion) => {
+                const count = emotion.users.getItems().length;
+
+                if (count === 0) {
+                  return null;
+                };
+
+                return (
+                  <div key={emotion.name} className='text-xs text-gray-400'>
+                    {emotion.name}: {count}
+                  </div>
+                )
+              })}
             </div>
             <div className="w-12/12" dangerouslySetInnerHTML={{ __html: message.content }} />
           </div>
