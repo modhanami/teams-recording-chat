@@ -125,6 +125,8 @@ function unmountDownloadButtons() {
   downloadButtons.forEach(button => {
     button.remove();
   });
+
+  downloadButtons = [];
 }
 
 async function mountDownloadButtons() {
@@ -152,3 +154,18 @@ async function mountDownloadButtons() {
 }
 
 mountDownloadButtons();
+
+window.addEventListener('hashchange', async (event) => {
+  console.log('Hash changed');
+  unmountDownloadButtons();
+  console.log('Unmounted download buttons');
+
+  // return if current page is not a thread page
+  if (!window.location.hash.startsWith('#/school/conversations')) {
+    console.log('Not a thread page, skip mounting download buttons');
+    return;
+  }
+
+  await mountDownloadButtons();
+  console.log(`Mounted ${downloadButtons.length} download buttons`);
+});
