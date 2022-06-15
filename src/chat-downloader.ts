@@ -2,32 +2,25 @@ import { createReplyChainManagerConnection, queryReplyChainMessages } from "./li
 import { BaseReplyChainMessage, ChatMessage } from "./shared/types";
 import { querySelectorAllWait } from "./utils";
 
-function makeDownloadButtonOnClickHandler(db: IDBDatabase, parentMessageId: string, threadId: string) {
+function makeDownloadButtonOnClickHandler(db: IDBDatabase, threadId: string, parentMessageId: string) {
   return async () => {
-    const messages = await queryReplyChainMessages(db, threadId, parentMessageId);
+    const allMessages = await queryReplyChainMessages(db, threadId, parentMessageId);
 
-    const sortedMessages = messages.sort((a, b) => a.sequenceId - b.sequenceId);
+    console.log('Raw messages from IndexedDB');
+    console.log(allMessages);
 
-    console.log('Before filtering & transforming');
-    console.log(sortedMessages);
-
-    const filteredMessagesFirstPass = sortedMessages.filter(message => {
-      const isDeleted = !!message.properties.deletetime;
-      return !isDeleted;
-    });
-
-    const recordedMeetingMessage = filteredMessagesFirstPass.find((message) => {
+    const recordedMeetingMessage = allMessages.find((message) => {
       const isMediaRecordingMessage = message.messageType === 'RichText/Media_CallRecording';
-      const hasAtp = !!message.properties.atp;
+      const hasAtpProperty = !!message.properties.atp; // has info about the corresponding sharepoint file
 
-      return isMediaRecordingMessage && hasAtp;
+      return isMediaRecordingMessage && hasAtpProperty;
     });
 
-    console.log('Recorded meeting message', recordedMeetingMessage);
-
-    if (!recordedMeetingMessage) {
+    if (recordedMeetingMessage === undefined) {
       console.log('This meeting is not recorded');
       return;
+    } else {
+      console.log('Recorded meeting message', recordedMeetingMessage);
     }
 
     const sharepointUrl = JSON.parse(recordedMeetingMessage.properties.atp)[0].URL;
@@ -35,14 +28,21 @@ function makeDownloadButtonOnClickHandler(db: IDBDatabase, parentMessageId: stri
     const sharepointFileId = decodeURIComponent(new URL(sharepointUrl).pathname);
     console.log('Sharepoint ID: ', sharepointFileId);
 
-    const filteredMessagesSecondPass = filteredMessagesFirstPass.filter(message => {
+    const notDeletedMessages = allMessages.filter(message => {
+      const hasDeletedProperty = !!message.properties.deletetime;
+      return !hasDeletedProperty;
+    });
+
+    const sortedMessages = notDeletedMessages.sort((a, b) => a.sequenceId - b.sequenceId);
+
+    const userMessages = sortedMessages.filter(message => {
       const isUserMessage = ["RichText/Html", "Text"].includes(message.messageType);
       return isUserMessage;
     });
 
-    const transformedMessages = filteredMessagesSecondPass.map(mapTeamsMessageToChatRendererCompatible);
+    const transformedMessages = userMessages.map(mapTeamsMessageToChatRendererCompatible);
 
-    console.log('After filtering & transforming');
+    console.log('Filtered & transformed messages');
     console.log(transformedMessages);
 
     // save transformed messages for this sharepoint file (to be picked up by the chat renderer)
@@ -53,7 +53,7 @@ function makeDownloadButtonOnClickHandler(db: IDBDatabase, parentMessageId: stri
 }
 
 
-function getThreadIdFromUrl(url: string) {
+function extractThreadIdFromUrl(url: string) {
   const threadIdKey = 'threadId';
   const queryStringStartIndex = url.indexOf(threadIdKey);
   const parsedQueryString = new URLSearchParams(url.substring(queryStringStartIndex));
@@ -95,41 +95,16 @@ function makeDownloadButton(text: string) {
 
 let downloadButtons: HTMLButtonElement[] = [];
 let handlers: (() => void)[] = [];
-const threadId = getThreadIdFromUrl(window.location.href);
 
-async function start() {
-  const threadElements = await getThreadElements();
-
-  const activeUserProfile = getMSALActiveUserProfileFromLocalStorage();
-  let db: IDBDatabase;
+async function createDBConnection(tid: string, oid: string) {
   try {
-    db = await createReplyChainManagerConnection(activeUserProfile.tid, activeUserProfile.oid);
+    const db = await createReplyChainManagerConnection(tid, oid);
     console.log('Connected to reply chain manager');
+    return db;
   } catch (e) {
     console.log('Failed to connect to reply chain manager');
     console.log(e);
     return;
-  }
-
-  for (let threadElement of threadElements) {
-    const entrypoint = getThreadElementEntrypoint(threadElement);
-
-    if (!entrypoint) {
-      continue;
-    }
-
-    // thread element's first child contains the parent message id
-    // prefixed with 't' (<div class="clearfix" id="t1642856185642">)
-    const parentMessageId = threadElement.firstElementChild.id.slice(1);
-
-    const downloadButton = makeDownloadButton(parentMessageId);
-    const handleClick = makeDownloadButtonOnClickHandler(db, parentMessageId, threadId);
-
-    downloadButton.addEventListener('click', handleClick);
-
-    downloadButtons.push(downloadButton);
-    handlers.push(handleClick);
-    entrypoint.appendChild(downloadButton);
   }
 }
 
@@ -138,15 +113,11 @@ function getMSALActiveUserProfileFromLocalStorage(): { tid: string, oid: string 
   return activeUserProfile;
 }
 
-async function getThreadElements() {
-  return Array.from(await querySelectorAllWait<HTMLDivElement>('.ts-message-list-item'));
+async function getThreadElements(): Promise<Element[]> {
+  return Array.from(await querySelectorAllWait<Element>('.ts-message-list-item'));
 }
 
-function getThreadElementEntrypoint(threadElement: HTMLDivElement) {
-  return threadElement.querySelector('.message-body-top-row');
-}
-
-function stop() {
+function unmountDownloadButtons() {
   downloadButtons.forEach((button, index) => {
     button.removeEventListener('click', handlers[index]);
   });
@@ -156,9 +127,28 @@ function stop() {
   });
 }
 
-function restart() {
-  stop();
-  start();
+async function mountDownloadButtons() {
+  const activeProfile = getMSALActiveUserProfileFromLocalStorage();
+  const db = await createDBConnection(activeProfile.tid, activeProfile.oid);
+  const threadElements = await getThreadElements();
+  const threadId = extractThreadIdFromUrl(window.location.href);
+
+  for (const threadElement of threadElements) {
+    // thread element's first child contains the parent message id
+    // prefixed with 't' (<div class="clearfix" id="t1642856185642">)
+    const parentMessageId = threadElement.firstElementChild.id.slice(1);
+
+    const downloadButton = makeDownloadButton(parentMessageId);
+    const handleClick = makeDownloadButtonOnClickHandler(db, threadId, parentMessageId);
+
+    downloadButton.addEventListener('click', handleClick);
+
+    const downloadButtonEntrypoint = threadElement.querySelector('.message-body-top-row');
+    downloadButtonEntrypoint.appendChild(downloadButton);
+
+    downloadButtons.push(downloadButton);
+    handlers.push(handleClick);
+  }
 }
 
-start();
+mountDownloadButtons();
