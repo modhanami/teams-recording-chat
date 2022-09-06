@@ -29,12 +29,13 @@ async function handleItemUrlMessage({ driveItemUrlWithAuthToken }: DriveItemUrlM
   console.log(`startTime: ${startTime}`);
   console.log(`endTime: ${endTime}`);
 
-  const contentContainer = (await querySelectorWait<HTMLDivElement>('.OneUp-content'));
-  const onePlayerContainerCarousel = contentContainer.querySelector<HTMLDivElement>('.OneUp-carousel');
+  const chatRendererContainer = await querySelectorWait<HTMLDivElement>('[aria-label="Video Player"]');
+  const playerContainer = await querySelectorWait<HTMLDivElement>('[aria-label="Video Player"] > div');
   const chatRendererWidth = '360px';
-  onePlayerContainerCarousel.style.width = `calc(100% - ${chatRendererWidth})`;
+  playerContainer.style.width = `calc(100% - ${chatRendererWidth})`;
+  chatRendererContainer.style.position = 'relative';
 
-  const chatRendererRoot = await mountChatRenderer(contentContainer, chatRendererWidth);
+  const chatRendererRoot = await mountChatRenderer(chatRendererContainer, chatRendererWidth);
   const sharepointFileId = new URL(document.location.href).searchParams.get('id');
 
   chrome.storage.local.get([sharepointFileId], function (result) {
@@ -63,7 +64,7 @@ async function handleItemUrlMessage({ driveItemUrlWithAuthToken }: DriveItemUrlM
 }
 
 async function observeCurrentTime(callback: (currentTime: number) => void) {
-  const msStreamPlayer = await querySelectorWait<HTMLVideoElement>('video[src^="blob"]');
+  const msStreamPlayer = await querySelectorWait<HTMLVideoElement>('.vjs-player video');
 
   msStreamPlayer.addEventListener('timeupdate', function (this, _event) {
     const currentTime = this.currentTime;
@@ -74,11 +75,12 @@ async function observeCurrentTime(callback: (currentTime: number) => void) {
 async function mountChatRenderer(root: HTMLElement, width: string) {
   const chatRendererElement = document.createElement('div');
   chatRendererElement.id = 'chat-renderer';
-  chatRendererElement.style.width = width;
-  chatRendererElement.style.height = '100%';
+  chatRendererElement.style.width = '360px';
+  chatRendererElement.style.top = '0';
+  chatRendererElement.style.bottom = '0';
+  chatRendererElement.style.right = '0';
   chatRendererElement.style.backgroundColor = '#b00335';
   chatRendererElement.style.position = 'absolute';
-  chatRendererElement.style.right = '0';
   root.appendChild(chatRendererElement);
   console.log('chatRendererElement');
   console.log(chatRendererElement);
