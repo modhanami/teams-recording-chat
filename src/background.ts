@@ -18,7 +18,7 @@ chrome.webRequest.onCompleted.addListener(function handler(details) {
   });
 }, {
   urls: [
-    "*://*.sharepoint.com/_api/v2.0/drives/*"
+    "*://*.sharepoint.com/*/_api/v2.0/drives/*"
   ]
 })
 
